@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>LoveOS — for You</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#0b0f14; --glass:rgba(255,255,255,0.08); --border:rgba(255,255,255,0.18);
+    --text:#e9eef5; --accent:#ff4d88; --accent-2:#ffd7a6; --shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;overflow:hidden}
+
+  /* Boot */
+  .boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+    background: radial-gradient(1200px 600px at 50% 30%, #122030 0%, #0b0f14 60%); z-index:1000}
+  .logo{font-weight:800;font-size:42px}
+  .tag{opacity:.75}
+  .btn{background:linear-gradient(180deg,#ff6fa3,#ff4d88);border:none;border-radius:12px;padding:12px 20px;color:white;
+    font-weight:700;cursor:pointer;box-shadow:var(--shadow)}
+  .hint{font-size:12px;opacity:.7}
+
+  /* Desktop layers */
+  .desktop{position:fixed;inset:0}
+  .wallpaper{position:fixed;inset:0;background:#0b0f14 center/cover no-repeat;z-index:0;filter:saturate(1.05)}
+  .overlay{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(1000px 400px at 30% 0%, rgba(255,255,255,.07), transparent 60%),
+      radial-gradient(900px 450px at 80% 100%, rgba(255,255,255,.05), transparent 60%);
+  }
+
+  .topbar{
+    position:fixed;top:0;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 12px;background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15));
+    backdrop-filter: blur(10px); border-bottom:1px solid var(--border); z-index:2;
+  }
+  .clock{opacity:.85;font-size:14px}
+  .brand{font-weight:700;letter-spacing:.4px}
+
+  /* Icons */
+  .icons{position:absolute;top:70px;left:20px;display:grid;grid-template-columns:repeat(1,80px);gap:18px;z-index:1}
+  .icon{width:80px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .icon .tile{width:54px;height:54px;border-radius:14px;background:var(--glass);border:1px solid var(--border);
+    display:grid;place-items:center;box-shadow:var(--shadow)}
+  .icon img{width:30px;height:30px;opacity:.92}
+  .icon span{font-size:12px;text-align:center;opacity:.95}
+
+  /* Window */
+  .win{
+    position:absolute;min-width:340px;min-height:220px;background:rgba(15,16,22,.78);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow); backdrop-filter: blur(12px); overflow:hidden; display:none; z-index:3;
+  }
+  .win.show{display:block}
+  .win.maximized{
+    top:44px !important; left:0 !important; right:0 !important; bottom:70px !important; width:auto !important; height:auto !important;
+  }
+  .titlebar{
+    height:36px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--border);
+    cursor:grab;background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    user-select:none;
+  }
+  .ctl{display:flex;align-items:center;gap:8px;margin-right:6px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dot.red{background:#ff5f57}.dot.yellow{background:#febc2e}.dot.green{background:#28c840}
+  .ctl .dot{cursor:pointer}
+  .ttl{font-size:13px;opacity:.9}
+  .content{padding:12px;overflow:auto;max-height:calc(70vh)}
+  .btn-sm{background:var(--glass);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:6px 10px;cursor:pointer}
+
+  /* Apps */
+  .photos-actions{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
+  .photos-grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px}
+  .photos-grid img{width:100%;height:140px;object-fit:cover;border-radius:10px;border:2px solid transparent;cursor:pointer}
+  .photos-grid img.sel{border-color:#ff6fa3}
+  .caption{font-size:12px;opacity:.8;margin-top:6px}
+
+  .note{background:#fff9d8;color:#2f2a10;padding:10px 12px;border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.2);margin:10px 0}
+  .note .t{font-weight:700}
+  .note .b{margin-top:4px}
+
+  .tracklist{list-style:none;padding:0;margin:10px 0;display:flex;flex-direction:column;gap:6px}
+  .tracklist li{display:flex;align-items:center;gap:10px;background:var(--glass);border:1px solid var(--border);padding:8px;border-radius:10px;cursor:pointer}
+  .tracklist li.active{outline:2px solid #ff6fa3}
+  .tracklist .name{flex:1}
+  .player-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+
+  .term{background:#070a0f;border-radius:10px;padding:10px;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+    color:#c8e1ff;min-height:160px;white-space:pre-wrap}
+  .prompt{color:#7ee787}
+
+  .treasure{display:grid;place-items:center;gap:10px;text-align:center;padding:20px}
+  .big{font-size:28px;font-weight:800;letter-spacing:.6px}
+  .sparkle{color:var(--accent-2)}
+  .secret{font-size:13px;opacity:.85}
+
+  /* Toast */
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;padding:10px 14px;border-radius:10px;opacity:0;transition:.3s;z-index:9}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+
+  /* Confetti */
+  .confetti{pointer-events:none;position:fixed;inset:0;overflow:hidden;z-index:999}
+  .piece{position:absolute;width:10px;height:14px;border-radius:2px;opacity:.9;animation:fall linear forwards}
+  @keyframes fall{0%{transform:translateY(-10vh) rotate(0deg)}100%{transform:translateY(110vh) rotate(720deg)}}
+
+  /* Dock */
+  .dock{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;padding:8px 10px;border-radius:14px;
+    border:1px solid var(--border);background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+    backdrop-filter: blur(14px); box-shadow:var(--shadow); z-index:4}
+  .dock .badge{background:#ff4d88;color:white;border-radius:999px;padding:2px 6px;font-size:11px;margin-left:6px}
+  .dock button{background:var(--glass);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:6px 10px;cursor:pointer}
+  .hidden{display:none}
+
+  /* Photo context menu */
+  .ctxmenu{
+    position:fixed; background:rgba(20,22,30,.95); border:1px solid var(--border); border-radius:10px;
+    padding:6px; z-index:9999; box-shadow:var(--shadow); display:none; min-width:180px;
+  }
+  .ctxmenu button{
+    width:100%; text-align:left; background:transparent; border:none; color:var(--text);
+    padding:8px 10px; border-radius:8px; cursor:pointer;
+  }
+  .ctxmenu button:hover{ background:rgba(255,255,255,.08); }
+</style>
+</head>
+<body>
+  <!-- Boot -->
+  <div class="boot" id="boot">
+    <div class="logo">LoveOS</div>
+    <div class="tag">“A tiny desktop, just for you.”</div>
+    <button class="btn" id="bootBtn">Start</button>
+    <div class="hint">Tip: open the Terminal and type <b>help</b> 💡</div>
+  </div>
+
+  <!-- Desktop -->
+  <div class="desktop" id="desktop" style="opacity:0;pointer-events:none;">
+    <div id="wall" class="wallpaper"></div>
+    <div class="overlay"></div>
+
+    <div class="topbar">
+      <div class="brand">LoveOS</div>
+      <div class="clock" id="clock"></div>
+    </div>
+
+    <!-- Icons -->
+    <div class="icons">
+      <div class="icon" data-app="photos">
+        <div class="tile"><img src="https://img.icons8.com/fluency/96/pictures-folder.png" alt=""></div>
+        <span>Photos</span>
+      </div>
+      <div class="icon" data-app="notes">
+        <div class="tile"><img src="https://img.icons8.com/fluency/96/note.png" alt=""></div>
+        <span>Notes</span>
+      </div>
+      <div class="icon" data-app="music">
+        <div class="tile"><img src="https://img.icons8.com/fluency/96/musical-notes.png" alt=""></div>
+        <span>Music</span>
+      </div>
+      <div class="icon" data-app="terminal">
+        <div class="tile"><img src="https://img.icons8.com/fluency/96/console.png" alt=""></div>
+        <span>Terminal</span>
+      </div>
+      <div class="icon hidden" data-app="treasure" id="treasureIcon">
+        <div class="tile"><img src="https://img.icons8.com/fluency/96/treasure-chest.png" alt=""></div>
+        <span>Treasure</span>
+      </div>
+    </div>
+
+    <!-- Windows -->
+    <div class="win" id="winPhotos" style="top:110px;left:180px;">
+      <div class="titlebar" data-drag data-app="photos">
+        <div class="ctl">
+          <span class="dot red" data-action="close"></span>
+          <span class="dot yellow" data-action="min"></span>
+          <span class="dot green" data-action="max"></span>
+        </div>
+        <div class="ttl">Photos</div>
+      </div>
+      <div class="content">
+        <div class="photos-actions">
+          <button class="btn-sm" id="btnSetWallpaper" disabled>Set selected as wallpaper</button>
+          <span class="caption" id="photoHint">Click a photo to select it ✨ (Right-click for menu)</span>
+        </div>
+        <div class="photos-grid" id="photosGrid">
+          <!-- Replace images with your own -->
+          <img src="IMG_0667.jpg" alt="">
+          <img src="IMG_6310.jpg" alt="">
+          <img src="IMG_7004.jpg" alt="">
+          <img src="IMG_7017.jpg" alt="">
+          <img src="IMG_6438.jpg" alt="">
+          <img src="IMG_7528.jpg" alt="">
+        </div>
+        <div class="caption">Select any photo → Set as wallpaper. Use Terminal to <b>unlock</b> the Treasure 😉</div>
+      </div>
+    </div>
+
+    <div class="win" id="winNotes" style="top:140px;left:520px;">
+      <div class="titlebar" data-drag data-app="notes">
+        <div class="ctl">
+          <span class="dot red" data-action="close"></span>
+          <span class="dot yellow" data-action="min"></span>
+          <span class="dot green" data-action="max"></span>
+        </div>
+        <div class="ttl">Notes</div>
+      </div>
+      <div class="content">
+        <div class="note">
+          <div class="t">The First Day</div>
+          <div class="b">The day we met still feels like a soft sunrise. I’m grateful for you.</div>
+        </div>
+        <div class="note">
+          <div class="t">Your Laugh</div>
+          <div class="b">If happiness had a sound, it would be your laugh. Keep laughing with me.</div>
+        </div>
+        <div class="note">
+          <div class="t">Forever Plan</div>
+          <div class="b">Let’s keep discovering new cafés and cities together — one tiny adventure at a time.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="win" id="winMusic" style="top:220px;left:260px;">
+      <div class="titlebar" data-drag data-app="music">
+        <div class="ctl">
+          <span class="dot red" data-action="close"></span>
+          <span class="dot yellow" data-action="min"></span>
+          <span class="dot green" data-action="max"></span>
+        </div>
+        <div class="ttl">Music</div>
+      </div>
+      <div class="content">
+        <ul class="tracklist" id="tracklist"></ul>
+        <div class="player-row">
+          <button class="btn-sm" id="btnPrev">⏮️ Prev</button>
+          <button class="btn-sm" id="btnPlay">▶️ Play</button>
+          <button class="btn-sm" id="btnNext">⏭️ Next</button>
+          <button class="btn-sm" id="btnShuffle">🔀 Shuffle</button>
+          <button class="btn-sm" id="btnAddSongs">➕ Add Songs</button>
+          <input id="fileSongs" type="file" accept="audio/*" multiple class="hidden">
+        </div>
+        <audio id="player" class="player" src="" controls loop style="width:100%;margin-top:8px;"></audio>
+        <div class="caption" id="nowPlaying">No track selected</div>
+      </div>
+    </div>
+
+    <div class="win" id="winTerminal" style="top:260px;left:560px;">
+      <div class="titlebar" data-drag data-app="terminal">
+        <div class="ctl">
+          <span class="dot red" data-action="close"></span>
+          <span class="dot yellow" data-action="min"></span>
+          <span class="dot green" data-action="max"></span>
+        </div>
+        <div class="ttl">Terminal</div>
+      </div>
+      <div class="content">
+        <div class="term" id="termOut">
+          <div>LoveOS Terminal — type <span style="color:#7ee787">help</span> for commands.</div>
+        </div>
+        <div class="inputline" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <span class="prompt">guest@loveos:~$</span>
+          <input id="termIn" placeholder="type a command..." style="flex:1;background:#0c1117;border:1px solid #1f2937;border-radius:8px;color:#c8e1ff;padding:8px 10px;font-family:inherit" />
+        </div>
+      </div>
+    </div>
+
+    <div class="win" id="winTreasure" style="top:180px;left:420px;">
+      <div class="titlebar" data-drag data-app="treasure">
+        <div class="ctl">
+          <span class="dot red" data-action="close"></span>
+          <span class="dot yellow" data-action="min"></span>
+          <span class="dot green" data-action="max"></span>
+        </div>
+        <div class="ttl">Treasure</div>
+      </div>
+      <div class="content treasure">
+        <div class="big">You found it! <span class="sparkle">✨</span></div>
+        <div class="secret">Here’s the secret: a date planned just for you on <b id="dateTxt">Friday</b>. Ready?</div>
+        <button class="btn" id="surpriseBtn">Reveal Surprise</button>
+      </div>
+    </div>
+
+    <!-- Dock -->
+    <div class="dock" id="dock">
+      <button data-app="photos">Photos</button>
+      <button data-app="notes">Notes</button>
+      <button data-app="music">Music</button>
+      <button data-app="terminal">Terminal <span id="dockUnread" class="badge hidden">1</span></button>
+      <button id="dockTreasureBtn" class="hidden" data-app="treasure">Treasure</button>
+    </div>
+  </div>
+
+  <!-- Confetti & Toast & Context menu -->
+  <div class="confetti" id="confetti"></div>
+  <div class="toast" id="toast">Wallpaper updated!</div>
+  <div class="ctxmenu" id="ctxMenu">
+    <button id="ctxSet">Set as wallpaper</button>
+    <button id="ctxView">View large</button>
+    <button id="ctxDown">Download</button>
+  </div>
+
+<script>
+  // ---------- Boot ----------
+  const boot = document.getElementById('boot');
+  const desktop = document.getElementById('desktop');
+  document.getElementById('bootBtn').addEventListener('click', () => {
+    boot.style.opacity = '0';
+    setTimeout(()=> boot.style.display='none', 400);
+    desktop.style.pointerEvents = 'auto';
+    desktop.style.opacity = '1';
+    // Open starter apps
+    setTimeout(()=> openApp('photos'), 500);
+    setTimeout(()=> openApp('terminal'), 900);
+  });
+
+  // ---------- Clock ----------
+  const clock = document.getElementById('clock');
+  function tickClock(){ clock.textContent = new Date().toLocaleString(); }
+  tickClock(); setInterval(tickClock, 1000);
+
+  // ---------- Z & window registry ----------
+  let zTop = 10;
+  function bringToFront(win){ win.style.zIndex = ++zTop; }
+
+  const windows = {
+    photos:  document.getElementById('winPhotos'),
+    notes:   document.getElementById('winNotes'),
+    music:   document.getElementById('winMusic'),
+    terminal:document.getElementById('winTerminal'),
+    treasure:document.getElementById('winTreasure'),
+  };
+
+  // ---------- Make windows draggable (unless maximized) ----------
+  Object.values(windows).forEach(makeDraggable);
+  function makeDraggable(win){
+    const bar = win.querySelector('[data-drag]');
+    let startX=0,startY=0, sx=0, sy=0, dragging=false;
+
+    // double-click title to toggle maximize
+    bar.addEventListener('dblclick', ()=> toggleMax(win));
+
+    bar.addEventListener('mousedown', (e)=>{
+      if(win.classList.contains('maximized')) return;
+      dragging=true; bringToFront(win);
+      startX=e.clientX; startY=e.clientY;
+      sx = parseInt(win.style.left||0); sy = parseInt(win.style.top||0);
+      bar.style.cursor='grabbing';
+    });
+    window.addEventListener('mousemove', (e)=>{
+      if(!dragging) return;
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      win.style.left = (sx+dx)+'px';
+      win.style.top  = (sy+dy)+'px';
+    });
+    window.addEventListener('mouseup', ()=>{ dragging=false; bar.style.cursor='grab'; });
+
+    // focus on click
+    win.addEventListener('mousedown', ()=> bringToFront(win));
+  }
+
+  // ---------- Window actions ----------
+  function openApp(name){
+    const w = windows[name]; if(!w) return;
+    w.classList.add('show');
+    w.dataset.minimized = 'false';
+    bringToFront(w);
+    if(name==='treasure'){ document.getElementById('dockTreasureBtn').classList.remove('hidden'); }
+  }
+  function closeWin(win){
+    if(win === windows.music){ const p=document.getElementById('player'); p && p.pause(); }
+    win.classList.remove('show'); win.classList.remove('maximized'); win.dataset.minimized = 'false';
+  }
+  function minimizeWin(win){
+    win.dataset.minimized = 'true';
+    win.classList.remove('maximized');
+    win.classList.remove('show');
+  }
+  function toggleMax(win){
+    if(!win.classList.contains('maximized')){
+      win.dataset.prevLeft = win.style.left||'';
+      win.dataset.prevTop  = win.style.top||'';
+      win.dataset.prevW    = win.style.width||'';
+      win.dataset.prevH    = win.style.height||'';
+      win.classList.add('maximized');
+    }else{
+      win.classList.remove('maximized');
+      win.style.left = win.dataset.prevLeft||win.style.left;
+      win.style.top  = win.dataset.prevTop||win.style.top;
+      win.style.width= win.dataset.prevW||'';
+      win.style.height=win.dataset.prevH||'';
+    }
+    bringToFront(win);
+  }
+
+  document.querySelectorAll('.titlebar').forEach(bar=>{
+    const app = bar.dataset.app;
+    const win = windows[app];
+    bar.addEventListener('click', (e)=>{
+      const act = e.target.dataset.action;
+      if(!act) return;
+      if(act==='close') closeWin(win);
+      if(act==='min')   minimizeWin(win);
+      if(act==='max')   toggleMax(win);
+      e.stopPropagation();
+    });
+  });
+
+  document.querySelectorAll('.icon').forEach(ic=>{
+    ic.addEventListener('dblclick', ()=> openApp(ic.dataset.app));
+    ic.addEventListener('click', ()=> bringToFront(windows[ic.dataset.app]||desktop));
+  });
+  document.querySelectorAll('.dock button[data-app]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openApp(btn.dataset.app));
+  });
+
+  // ---------- Toast ----------
+  const toast = document.getElementById('toast');
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=> toast.classList.remove('show'), 1600);
+  }
+
+  // ---------- Wallpaper (with persistence) ----------
+  const wall = document.getElementById('wall');
+  const LS_WALL = 'loveos.wallpaper';
+  const savedWall = localStorage.getItem(LS_WALL);
+  if(savedWall){ wall.style.backgroundImage = `url('${savedWall}')`; }
+
+  let selectedPhoto = null;
+  const photosGrid = document.getElementById('photosGrid');
+  const btnSetWallpaper = document.getElementById('btnSetWallpaper');
+
+  photosGrid.querySelectorAll('img').forEach(img=>{
+    img.addEventListener('click', ()=>{
+      photosGrid.querySelectorAll('img').forEach(i=>i.classList.remove('sel'));
+      img.classList.add('sel');
+      selectedPhoto = img.src;
+      btnSetWallpaper.disabled = false;
+      document.getElementById('photoHint').textContent = 'Ready to set wallpaper ✨';
+    });
+  });
+
+  btnSetWallpaper.addEventListener('click', ()=> setWallpaper(selectedPhoto));
+  function setWallpaper(url){
+    if(!url) return;
+    wall.style.backgroundImage = `url('${url}')`;
+    localStorage.setItem(LS_WALL, url);
+    showToast('Wallpaper updated!');
+  }
+
+  // ---------- Photo context menu (Set/View/Download) ----------
+  const ctxMenu = document.getElementById('ctxMenu');
+  let ctxTargetSrc = null;
+
+  photosGrid.addEventListener('contextmenu', (e)=>{
+    const img = e.target.closest('img');
+    if(!img) return;
+    e.preventDefault();
+    ctxTargetSrc = img.src;
+    // selection highlight
+    photosGrid.querySelectorAll('img').forEach(i=>i.classList.remove('sel'));
+    img.classList.add('sel');
+    selectedPhoto = img.src;
+    btnSetWallpaper.disabled = false;
+
+    // position + show
+    ctxMenu.style.left = Math.min(e.clientX, window.innerWidth-200)+'px';
+    ctxMenu.style.top  = Math.min(e.clientY, window.innerHeight-120)+'px';
+    ctxMenu.style.display = 'block';
+  });
+
+  document.addEventListener('click', ()=>{
+    ctxMenu.style.display = 'none';
+  });
+
+  document.getElementById('ctxSet').addEventListener('click', ()=>{
+    if(ctxTargetSrc) setWallpaper(ctxTargetSrc);
+  });
+  document.getElementById('ctxView').addEventListener('click', ()=>{
+    if(ctxTargetSrc) window.open(ctxTargetSrc, '_blank');
+  });
+  document.getElementById('ctxDown').addEventListener('click', ()=>{
+    if(!ctxTargetSrc) return;
+    const a = document.createElement('a');
+    a.href = ctxTargetSrc;
+    a.download = 'memory.jpg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  // ---------- Music: Playlist + Controls (with persistence) ----------
+  const player = document.getElementById('player');
+  const tracklistEl = document.getElementById('tracklist');
+  const nowPlaying = document.getElementById('nowPlaying');
+  const fileInput = document.getElementById('fileSongs');
+
+  const LS_PLAYLIST = 'loveos.playlist';
+  const LS_CURRENT  = 'loveos.current';
+  const LS_SHUFFLE  = 'loveos.shuffle';
+
+  // Default playlist (files next to this HTML, or replace with URLs)
+  let playlist = [
+    { name: 'Our Song 1', src: './song.mp3' },
+    { name: 'Our Song 2', src: './song2.mp3' },
+    { name: 'Our Song 3', src: './song3.mp3' },
+    { name: 'Our Song 4', src: './song4.mp3' },
+    { name: 'Our Song 5', src: './song1.mp3' },
+  ];
+
+  // Restore saved playlist (only non-blob items)
+  try{
+    const saved = JSON.parse(localStorage.getItem(LS_PLAYLIST)||'null');
+    if(Array.isArray(saved)){
+      playlist = saved.filter(t => typeof t.src === 'string' && !t.src.startsWith('blob:'));
+    }
+  }catch{}
+
+  let current = Number(localStorage.getItem(LS_CURRENT) ?? -1);
+  let shuffled = localStorage.getItem(LS_SHUFFLE) === 'true';
+
+  function persistPlaylist(){
+    // Save only non-blob tracks
+    const safe = playlist.filter(t => !String(t.src||'').startsWith('blob:'));
+    localStorage.setItem(LS_PLAYLIST, JSON.stringify(safe));
+  }
+  function persistState(){
+    localStorage.setItem(LS_CURRENT, String(current));
+    localStorage.setItem(LS_SHUFFLE, String(shuffled));
+  }
+
+  function renderPlaylist(){
+    tracklistEl.innerHTML = '';
+    playlist.forEach((t, idx)=>{
+      const li = document.createElement('li');
+      li.dataset.index = idx;
+      li.innerHTML = `
+        <span>🎵</span>
+        <span class="name">${t.name}</span>
+        <span class="caption">${t.src.startsWith('blob:') ? '(local)' : ''}</span>
+      `;
+      li.addEventListener('dblclick', ()=> playIndex(idx));
+      li.addEventListener('click', ()=>{
+        tracklistEl.querySelectorAll('li').forEach(n=>n.classList.remove('active'));
+        li.classList.add('active');
+      });
+      tracklistEl.appendChild(li);
+    });
+  }
+  function markActive(){
+    tracklistEl.querySelectorAll('li').forEach(n=>n.classList.remove('active'));
+    const li = tracklistEl.querySelector(`li[data-index="${current}"]`);
+    if(li) li.classList.add('active');
+  }
+  function playIndex(i){
+    if(i<0 || i>=playlist.length) return;
+    current = i;
+    const t = playlist[current];
+    player.src = t.src;
+    player.play().catch(()=>{});
+    nowPlaying.textContent = `Now playing: ${t.name}`;
+    markActive();
+    persistState();
+  }
+  function next(){
+    if(playlist.length===0) return;
+    if(shuffled){
+      let n;
+      do { n = Math.floor(Math.random()*playlist.length); } while (playlist.length>1 && n===current);
+      playIndex(n);
+    }else{
+      playIndex((current+1)%playlist.length);
+    }
+  }
+  function prev(){
+    if(playlist.length===0) return;
+    playIndex((current-1+playlist.length)%playlist.length);
+  }
+
+  document.getElementById('btnPlay').addEventListener('click', ()=>{
+    if(player.paused && current!==-1){ player.play(); }
+    else if(current===-1){ playIndex(0); }
+    else { player.pause(); }
+  });
+  document.getElementById('btnNext').addEventListener('click', next);
+  document.getElementById('btnPrev').addEventListener('click', prev);
+  document.getElementById('btnShuffle').addEventListener('click', ()=>{
+    shuffled = !shuffled;
+    showToast(shuffled ? 'Shuffle ON' : 'Shuffle OFF');
+    persistState();
+  });
+
+  document.getElementById('btnAddSongs').addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', ()=>{
+    const files = Array.from(fileInput.files||[]);
+    files.forEach(f=>{
+      const url = URL.createObjectURL(f);
+      playlist.push({ name: f.name.replace(/\.[^/.]+$/, ''), src: url, _blob:true });
+    });
+    renderPlaylist();
+    if(current===-1 && playlist.length>0){ playIndex(0); }
+    persistPlaylist(); // blobs are omitted automatically
+  });
+
+  player.addEventListener('ended', next);
+
+  renderPlaylist();
+  // If we had a saved current index, try to restore it
+  if(current>=0 && current<playlist.length){
+    nowPlaying.textContent = `Ready: ${playlist[current].name}`;
+    markActive();
+  } else {
+    current = -1;
+  }
+
+  // ---------- Terminal ----------
+  const termOut = document.getElementById('termOut');
+  const termIn = document.getElementById('termIn');
+  const dockUnread = document.getElementById('dockUnread');
+  const treasureIcon = document.getElementById('treasureIcon');
+
+  const cmds = {
+    help(){ print(`Commands:
+  help       - show this help
+  clear      - clear screen
+  love       - a tiny confession
+  date       - show the date I picked
+  unlock     - unlock a hidden treasure
+  song       - open the music player
+  wallpaper  - set wallpaper to a random photo
+`); },
+    clear(){ termOut.innerHTML=''; },
+    love(){ print('<span style="color:#ff7aa2">❤ ❤ ❤ I love you more than words can hold. ❤ ❤ ❤</span>'); sparkle(); },
+    date(){
+      const d = new Date(); const inTwo = new Date(d.getTime()+ 2*24*60*60*1000);
+      const msg = inTwo.toDateString(); print(`Our date is set for: ${msg}`);
+      document.getElementById('dateTxt').textContent = msg;
+    },
+    unlock(){
+      print('Treasure unlocked! Look at the desktop icons and the dock.');
+      treasureIcon.classList.remove('hidden');
+      document.getElementById('dockTreasureBtn').classList.remove('hidden');
+      sparkle();
+    },
+    song(){ openApp('music'); print('Opening Music …'); },
+    wallpaper(){
+      const imgs = Array.from(photosGrid.querySelectorAll('img'));
+      const pick = imgs[Math.floor(Math.random()*imgs.length)];
+      if(pick){ setWallpaper(pick.src); print('Wallpaper set to a random photo.'); }
+    }
+  };
+
+  function print(html){
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    termOut.appendChild(div);
+    termOut.scrollTop = termOut.scrollHeight;
+    dockUnread.classList.remove('hidden');
+    setTimeout(()=>dockUnread.classList.add('hidden'), 1500);
+  }
+
+  termIn.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      const val = termIn.value.trim(); if(!val) return;
+      print(`<span class="prompt">guest@loveos:~$</span> ${val}`);
+      if(cmds[val]) cmds[val](); else print(`command not found: ${val}`);
+      termIn.value='';
+    }
+  });
+
+  // ---------- Treasure surprise ----------
+  document.getElementById('surpriseBtn').addEventListener('click', ()=>{
+    sparkle(140);
+    setTimeout(()=> window.open('https://open.spotify.com/search/our%20song','_blank'), 1200);
+  });
+
+  // ---------- Confetti ----------
+  const confetti = document.getElementById('confetti');
+  function sparkle(count=80){
+    for(let i=0;i<count;i++){
+      const p = document.createElement('div');
+      p.className='piece';
+      p.style.left = Math.random()*100+'%';
+      p.style.top = '-5vh';
+      p.style.background = randomColor();
+      p.style.animationDuration = (3+Math.random()*2)+'s';
+      p.style.animationDelay = (Math.random()*0.3)+'s';
+      confetti.appendChild(p);
+      setTimeout(()=> p.remove(), 6000);
+    }
+  }
+  function randomColor(){
+    const arr = ['#ff4d88','#ffd166','#06d6a0','#4cc9f0','#f72585','#b5179e','#ff9f1c'];
+    return arr[Math.floor(Math.random()*arr.length)];
+  }
+</script>
+</body>
+</html>
